@@ -33,22 +33,22 @@
     }
     .header {
       background: #1a1a1a; color: white;
-      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; display: flex; align-items: center; gap: 8px;
       flex-shrink: 0; z-index: 10; border-bottom: 1px solid #333;
       flex-wrap: wrap;
     }
     .header select {
-      flex: 1; min-width: 80px;
-      padding: 8px 12px; border-radius: 20px;
-      border: 1px solid #444; font-size: 16px; background: #2a2a2a; color: white;
+      flex: 1; min-width: 70px;
+      padding: 8px 10px; border-radius: 20px;
+      border: 1px solid #444; font-size: 14px; background: #2a2a2a; color: white;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 12px center;
+      background-repeat: no-repeat; background-position: right 10px center;
     }
     .header select option { color: #333; background: white; }
     .header button {
-      background: #333; border: none; color: white; font-size: 18px;
-      width: 36px; height: 36px; border-radius: 50%;
+      background: #333; border: none; color: white; font-size: 16px;
+      width: 34px; height: 34px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center; cursor: pointer;
     }
     .chat-list {
@@ -134,14 +134,14 @@
       font-size: 14px; background: #2a2a2a; color: white;
     }
     .modal-content textarea { height: 100px; resize: vertical; }
-    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; }
-    .modal-buttons button { padding: 8px 20px; border-radius: 20px; border: none; cursor: pointer; }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+    .modal-buttons button { padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; }
     .btn-cancel { background: #444; color: #ccc; }
     .btn-save { background: #fff; color: #000; font-weight: bold; }
+    .btn-delete { background: #e53935; color: white; }
     .hidden { display: none !important; }
     .empty-hint { text-align: center; color: #888; margin-top: 50%; }
 
-    /* 模型选择卡片样式 */
     .model-card {
       display: flex; align-items: center; gap: 12px;
       background: #2a2a2a; padding: 12px; border-radius: 12px;
@@ -159,9 +159,11 @@
     <select id="personaSelect" title="用户人设">
       <option value="default">🙋 默认</option>
     </select>
-    <select id="characterSelect" title="AI 角色"></select>
     <button id="addPersonaBtn" title="新增用户人设">👤＋</button>
+    <button id="delPersonaBtn" title="删除当前人设" style="font-size:14px;">🗑️</button>
+    <select id="characterSelect" title="AI 角色"></select>
     <button id="addCharacterBtn" title="新增AI角色">🤖＋</button>
+    <button id="delCharacterBtn" title="删除当前AI角色" style="font-size:14px;">🗑️</button>
     <button id="settingsBtn" title="模型与设置">⚙️</button>
   </div>
   <div class="chat-list" id="chatList">
@@ -181,7 +183,7 @@
 <input type="file" id="bgFileInput" accept="image/*" style="display:none;">
 <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
 
-<!-- 设置弹窗（含模型选择） -->
+<!-- 设置弹窗 -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h3>设置</h3>
@@ -206,26 +208,28 @@
   </div>
 </div>
 
-<!-- 人设编辑弹窗 -->
+<!-- 人设编辑弹窗（含删除） -->
 <div id="personaModal" class="modal hidden">
   <div class="modal-content">
     <h3 id="personaModalTitle">新增用户人设</h3>
     <input type="text" id="personaNameInput" placeholder="人设名称（如：小明）">
     <textarea id="personaPromptInput" placeholder="人设描述（如：你是一个喜欢用文言文说话的文人）"></textarea>
     <div class="modal-buttons">
+      <button class="btn-delete hidden" id="deletePersonaBtn">删除人设</button>
       <button class="btn-cancel" id="cancelPersonaBtn">取消</button>
       <button class="btn-save" id="savePersonaBtn">保存</button>
     </div>
   </div>
 </div>
 
-<!-- AI 角色编辑弹窗 -->
+<!-- AI 角色编辑弹窗（含删除） -->
 <div id="editModal" class="modal hidden">
   <div class="modal-content">
     <h3 id="modalTitle">编辑角色</h3>
     <input type="text" id="charNameInput" placeholder="角色名称">
     <textarea id="charPromptInput" placeholder="系统提示"></textarea>
     <div class="modal-buttons">
+      <button class="btn-delete hidden" id="deleteCharacterBtn">删除角色</button>
       <button class="btn-cancel" id="cancelEditBtn">取消</button>
       <button class="btn-save" id="saveEditBtn">保存</button>
     </div>
@@ -274,7 +278,9 @@
   const personaSelect = document.getElementById('personaSelect');
   const characterSelect = document.getElementById('characterSelect');
   const addPersonaBtn = document.getElementById('addPersonaBtn');
+  const delPersonaBtn = document.getElementById('delPersonaBtn');
   const addCharacterBtn = document.getElementById('addCharacterBtn');
+  const delCharacterBtn = document.getElementById('delCharacterBtn');
   const settingsBtn = document.getElementById('settingsBtn');
   const chatList = document.getElementById('chatList');
   const userInput = document.getElementById('userInput');
@@ -293,12 +299,14 @@
   const personaPromptInput = document.getElementById('personaPromptInput');
   const cancelPersonaBtn = document.getElementById('cancelPersonaBtn');
   const savePersonaBtn = document.getElementById('savePersonaBtn');
+  const deletePersonaBtn = document.getElementById('deletePersonaBtn');
   const editModal = document.getElementById('editModal');
   const modalTitle = document.getElementById('modalTitle');
   const charNameInput = document.getElementById('charNameInput');
   const charPromptInput = document.getElementById('charPromptInput');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
   const saveEditBtn = document.getElementById('saveEditBtn');
+  const deleteCharacterBtn = document.getElementById('deleteCharacterBtn');
   const compressToggle = document.getElementById('compressToggle');
   const totalTokensEl = document.getElementById('totalTokens');
   let isEditMode = false, editingCharId = null;
@@ -313,7 +321,6 @@
     document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
     document.getElementById(model === 'deepseek-v4-flash' ? 'modelChoiceV4Flash' : 'modelChoiceV4Pro').checked = true;
   }
-  // 初始化模型选中状态
   selectModel(MODEL_NAME);
 
   // ==================== 设置弹窗 ====================
@@ -403,7 +410,7 @@
     avatarFileInput.value = '';
   });
 
-  // ==================== 人设管理 ====================
+  // ==================== 用户人设管理（含删除） ====================
   function renderPersonaSelect() {
     personaSelect.innerHTML = '';
     personas.forEach(p => {
@@ -418,21 +425,43 @@
     return p ? p.prompt : '';
   }
   personaSelect.addEventListener('change', e => { currentPersonaId = e.target.value; });
+
   addPersonaBtn.addEventListener('click', () => {
     isPersonaEditMode = false; editingPersonaId = null;
     personaModalTitle.textContent = '新增用户人设';
     personaNameInput.value = ''; personaPromptInput.value = '';
+    deletePersonaBtn.classList.add('hidden');
     personaModal.classList.remove('hidden');
   });
+
+  // 点击删除按钮，删除当前选中的人设
+  delPersonaBtn.addEventListener('click', () => {
+    if (currentPersonaId === 'default') {
+      alert('不能删除默认人设');
+      return;
+    }
+    if (confirm('确定要删除当前选中的用户人设吗？')) {
+      personas = personas.filter(p => p.id !== currentPersonaId);
+      savePersonas(personas);
+      currentPersonaId = personas[0]?.id || 'default';
+      renderPersonaSelect();
+      // 不需要更新对话，仅更改人设
+    }
+  });
+
+  // 双击下拉框编辑（仅限非默认人设）
   personaSelect.addEventListener('dblclick', () => {
     const p = personas.find(p => p.id === currentPersonaId);
     if (!p || p.id === 'default') return;
     isPersonaEditMode = true; editingPersonaId = p.id;
     personaModalTitle.textContent = '编辑用户人设';
     personaNameInput.value = p.name; personaPromptInput.value = p.prompt;
+    deletePersonaBtn.classList.remove('hidden'); // 编辑时显示删除按钮
     personaModal.classList.remove('hidden');
   });
+
   cancelPersonaBtn.addEventListener('click', () => personaModal.classList.add('hidden'));
+
   savePersonaBtn.addEventListener('click', () => {
     const name = personaNameInput.value.trim();
     const prompt = personaPromptInput.value.trim();
@@ -449,9 +478,22 @@
     renderPersonaSelect();
     personaModal.classList.add('hidden');
   });
+
+  // 弹窗内部的删除按钮
+  deletePersonaBtn.addEventListener('click', () => {
+    if (editingPersonaId === 'default') { alert('不能删除默认人设'); return; }
+    if (confirm('确定删除此用户人设吗？')) {
+      personas = personas.filter(p => p.id !== editingPersonaId);
+      savePersonas(personas);
+      currentPersonaId = personas[0]?.id || 'default';
+      renderPersonaSelect();
+      personaModal.classList.add('hidden');
+    }
+  });
+
   personaModal.addEventListener('click', e => { if(e.target === personaModal) personaModal.classList.add('hidden'); });
 
-  // ==================== AI 角色管理 ====================
+  // ==================== AI 角色管理（含删除） ====================
   function renderCharacterSelect() {
     characterSelect.innerHTML = '';
     appData.characters.forEach(c => {
@@ -466,18 +508,44 @@
     return c ? c.systemPrompt : '';
   }
   characterSelect.addEventListener('change', e => { currentCharId = e.target.value; updateUI(); });
-  addCharacterBtn.addEventListener('click', openAddModal);
-  function openAddModal() {
-    isEditMode = false; editingCharId = null; modalTitle.textContent = '新增AI角色';
-    charNameInput.value = ''; charPromptInput.value = ''; editModal.classList.remove('hidden'); charNameInput.focus();
-  }
-  function openEditModal() {
-    const c = appData.characters.find(c => c.id === currentCharId); if(!c) return;
-    isEditMode = true; editingCharId = c.id; modalTitle.textContent = '编辑AI角色';
-    charNameInput.value = c.name; charPromptInput.value = c.systemPrompt; editModal.classList.remove('hidden'); charNameInput.focus();
-  }
-  document.getElementById('editCharacterBtn').addEventListener('click', openEditModal);
+
+  addCharacterBtn.addEventListener('click', () => {
+    isEditMode = false; editingCharId = null;
+    modalTitle.textContent = '新增AI角色';
+    charNameInput.value = ''; charPromptInput.value = '';
+    deleteCharacterBtn.classList.add('hidden');
+    editModal.classList.remove('hidden');
+  });
+
+  // 删除当前AI角色按钮
+  delCharacterBtn.addEventListener('click', () => {
+    if (currentCharId === 'default') {
+      alert('不能删除默认AI角色');
+      return;
+    }
+    if (confirm('确定要删除当前选中的AI角色及其聊天记录吗？')) {
+      appData.characters = appData.characters.filter(c => c.id !== currentCharId);
+      delete appData.messages[currentCharId];
+      saveData(appData);
+      currentCharId = appData.characters[0]?.id || null;
+      renderCharacterSelect();
+      renderMessages();
+    }
+  });
+
+  // 双击编辑AI角色（非默认）
+  characterSelect.addEventListener('dblclick', () => {
+    const c = appData.characters.find(c => c.id === currentCharId);
+    if (!c || c.id === 'default') return;
+    isEditMode = true; editingCharId = c.id;
+    modalTitle.textContent = '编辑AI角色';
+    charNameInput.value = c.name; charPromptInput.value = c.systemPrompt;
+    deleteCharacterBtn.classList.remove('hidden');
+    editModal.classList.remove('hidden');
+  });
+
   cancelEditBtn.addEventListener('click', () => editModal.classList.add('hidden'));
+
   saveEditBtn.addEventListener('click', () => {
     const name = charNameInput.value.trim(), prompt = charPromptInput.value.trim();
     if(!name||!prompt){ alert('请填写完整'); return; }
@@ -487,10 +555,27 @@
     } else {
       const newId = 'c'+Date.now();
       appData.characters.push({ id:newId, name, systemPrompt:prompt });
-      appData.messages[newId] = []; currentCharId = newId;
+      appData.messages[newId] = [];
+      currentCharId = newId;
     }
     saveData(appData); updateUI(); editModal.classList.add('hidden');
   });
+
+  deleteCharacterBtn.addEventListener('click', () => {
+    if (editingCharId === 'default') { alert('不能删除默认角色'); return; }
+    if (confirm('确定删除此AI角色及其聊天记录吗？')) {
+      appData.characters = appData.characters.filter(c => c.id !== editingCharId);
+      delete appData.messages[editingCharId];
+      saveData(appData);
+      if (currentCharId === editingCharId) {
+        currentCharId = appData.characters[0]?.id || null;
+      }
+      renderCharacterSelect();
+      renderMessages();
+      editModal.classList.add('hidden');
+    }
+  });
+
   editModal.addEventListener('click', e => { if(e.target === editModal) editModal.classList.add('hidden'); });
 
   // ==================== Token 统计与压缩 ====================
@@ -561,7 +646,6 @@
     if(!content || !currentCharId) return;
     if(!appData.messages[currentCharId]) appData.messages[currentCharId] = [];
 
-    // 构建含用户人设的消息
     const personaPrompt = getCurrentPersonaPrompt();
     let userMsgContent = content;
     if (personaPrompt) {

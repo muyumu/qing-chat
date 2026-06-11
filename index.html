@@ -177,14 +177,6 @@
     }
     .popup-menu button:hover { background: #444; }
     .popup-menu button.delete-btn { color: #e53935; }
-
-    .toast {
-      position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
-      background: #e53935; color: white; padding: 10px 20px; border-radius: 24px;
-      font-size: 14px; z-index: 300; opacity: 0.95;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      pointer-events: none; transition: opacity 0.3s;
-    }
   </style>
 </head>
 <body>
@@ -260,10 +252,16 @@
   </div>
 </div>
 
-<!-- 设置弹窗 -->
+<!-- 设置弹窗（含 API Key） -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h3>设置</h3>
+    <h4>API Key</h4>
+    <input type="password" id="settingsApiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <div class="modal-buttons">
+      <button class="btn-cancel" id="clearSettingsKeyBtn">清除 Key</button>
+      <button class="btn-save" id="saveSettingsKeyBtn">保存 Key</button>
+    </div>
     <h4>模型选择</h4>
     <div class="model-card" id="modelCardFlash" onclick="selectModel('deepseek-v4-flash')">
       <input type="radio" name="modelChoice" value="deepseek-v4-flash" checked>
@@ -273,13 +271,7 @@
       <input type="radio" name="modelChoice" value="deepseek-v4-pro">
       <span class="model-name">V4-Pro (专家模式)</span>
     </div>
-    <h4>API Key</h4>
-    <input type="password" id="settingsApiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx">
-    <div style="display:flex; gap:8px; margin-top:4px;">
-      <button class="btn-cancel" id="clearSettingsKeyBtn">清除 Key</button>
-      <button class="btn-save" id="saveSettingsKeyBtn">保存 Key</button>
-    </div>
-    <div class="modal-buttons" style="margin-top:8px;">
+    <div class="modal-buttons" style="margin-top:12px;">
       <button class="btn-cancel" id="closeSettingsModal">关闭</button>
     </div>
   </div>
@@ -289,8 +281,8 @@
 <div id="personaEditModal" class="modal hidden">
   <div class="modal-content">
     <h3 id="personaEditTitle">新增用户人设</h3>
-    <input type="text" id="personaNameInput" placeholder="人设名称（如：小明）">
-    <textarea id="personaPromptInput" placeholder="人设描述（如：你是一个喜欢用文言文说话的文人）"></textarea>
+    <input type="text" id="personaNameInput" placeholder="人设名称">
+    <textarea id="personaPromptInput" placeholder="人设描述"></textarea>
     <div class="modal-buttons">
       <button class="btn-delete hidden" id="deletePersonaBtn">删除</button>
       <button class="btn-cancel" id="cancelPersonaBtn">取消</button>
@@ -315,7 +307,7 @@
 
 <script>
   // ==================== 配置 ====================
-  const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+  const API_URL = 'https://api.deepseek.com/v1/chat/completions'; // 直连
   let MODEL_NAME = localStorage.getItem('selectedModel') || 'deepseek-v4-flash';
   const MAX_TOKENS = 30000;
   const KEY_STORAGE = 'user_api_key';
@@ -349,7 +341,6 @@
   let currentCharId = appData.characters[0]?.id || null;
   let currentPersonaId = personas[0]?.id || 'default';
 
-  // ==================== DOM 元素 ====================
   const chatList = document.getElementById('chatList');
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
@@ -361,28 +352,64 @@
   const totalTokensEl = document.getElementById('totalTokens');
   let currentAvatarTarget = null;
 
-  // 顶部按钮
-  document.getElementById('personaBtn').addEventListener('click', openPersonaModal);
-  document.getElementById('charBtn').addEventListener('click', openCharModal);
-  document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
-
-  // 简单 Toast 提示
+  // ==================== 工具函数 ====================
   function showToast(msg) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = msg;
+    toast.style.cssText = 'position:fixed; bottom:120px; left:50%; transform:translateX(-50%); background:#e53935; color:white; padding:10px 20px; border-radius:24px; font-size:14px; z-index:300; opacity:0.95; box-shadow:0 4px 12px rgba(0,0,0,0.5);';
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
   }
 
+  // ==================== 模型选择 ====================
+  window.selectModel = function(model) {
+    MODEL_NAME = model;
+    localStorage.setItem('selectedModel', model);
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
+    document.querySelector(`input[value="${model}"]`).checked = true;
+  };
+  selectModel(MODEL_NAME);
+
+  // ==================== 弹窗通用事件 ====================
+  function closeModal(modal) { modal.classList.add('hidden'); }
+  document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if(e.target === m) m.classList.add('hidden'); }));
+
+  // ==================== 设置弹窗 ====================
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsApiKeyInput = document.getElementById('settingsApiKeyInput');
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    settingsApiKeyInput.value = currentApiKey;
+    settingsModal.classList.remove('hidden');
+  });
+  document.getElementById('closeSettingsModal').addEventListener('click', () => closeModal(settingsModal));
+  document.getElementById('saveSettingsKeyBtn').addEventListener('click', () => {
+    const key = settingsApiKeyInput.value.trim();
+    if (key && !key.startsWith('sk-')) { showToast('Key 应以 sk- 开头'); return; }
+    localStorage.setItem(KEY_STORAGE, key);
+    currentApiKey = key;
+    closeModal(settingsModal);
+    showToast('Key 已保存');
+  });
+  document.getElementById('clearSettingsKeyBtn').addEventListener('click', () => {
+    localStorage.removeItem(KEY_STORAGE);
+    currentApiKey = '';
+    settingsApiKeyInput.value = '';
+    showToast('Key 已清除');
+  });
+
   // ==================== 用户人设管理弹窗 ====================
   const personaModal = document.getElementById('personaModal');
   const personaList = document.getElementById('personaList');
-  document.getElementById('closePersonaModal').addEventListener('click', () => personaModal.classList.add('hidden'));
+  document.getElementById('personaBtn').addEventListener('click', () => {
+    renderPersonaList();
+    personaModal.classList.remove('hidden');
+  });
+  document.getElementById('closePersonaModal').addEventListener('click', () => closeModal(personaModal));
   document.getElementById('addPersonaBtn').addEventListener('click', openNewPersona);
-  personaModal.addEventListener('click', e => { if(e.target === personaModal) personaModal.classList.add('hidden'); });
 
   function renderPersonaList() {
     personaList.innerHTML = '';
@@ -417,7 +444,7 @@
     deleteBtn.className = 'delete-btn';
     deleteBtn.addEventListener('click', () => {
       menu.remove();
-      if (persona.id === 'default') { alert('不能删除默认人设'); return; }
+      if (persona.id === 'default') { showToast('不能删除默认人设'); return; }
       if (confirm('确定删除此用户人设吗？')) {
         personas = personas.filter(x => x.id !== persona.id);
         if (currentPersonaId === persona.id) currentPersonaId = personas[0]?.id || 'default';
@@ -444,17 +471,15 @@
     setTimeout(() => document.addEventListener('click', closeMenu), 10);
   }
 
-  function openPersonaModal() {
-    renderPersonaList();
-    personaModal.classList.remove('hidden');
-  }
-
   // ==================== AI 角色管理弹窗 ====================
   const charModal = document.getElementById('charModal');
   const charList = document.getElementById('charList');
-  document.getElementById('closeCharModal').addEventListener('click', () => charModal.classList.add('hidden'));
+  document.getElementById('charBtn').addEventListener('click', () => {
+    renderCharList();
+    charModal.classList.remove('hidden');
+  });
+  document.getElementById('closeCharModal').addEventListener('click', () => closeModal(charModal));
   document.getElementById('addCharBtn').addEventListener('click', openNewCharacter);
-  charModal.addEventListener('click', e => { if(e.target === charModal) charModal.classList.add('hidden'); });
 
   function renderCharList() {
     charList.innerHTML = '';
@@ -489,7 +514,7 @@
     deleteBtn.className = 'delete-btn';
     deleteBtn.addEventListener('click', () => {
       menu.remove();
-      if (character.id === 'default') { alert('不能删除默认AI角色'); return; }
+      if (character.id === 'default') { showToast('不能删除默认AI角色'); return; }
       if (confirm('确定删除此AI角色及其聊天记录吗？')) {
         appData.characters = appData.characters.filter(x => x.id !== character.id);
         delete appData.messages[character.id];
@@ -518,45 +543,6 @@
     setTimeout(() => document.addEventListener('click', closeMenu), 10);
   }
 
-  function openCharModal() {
-    renderCharList();
-    charModal.classList.remove('hidden');
-  }
-
-  // ==================== 设置弹窗 ====================
-  const settingsModal = document.getElementById('settingsModal');
-  const settingsApiKeyInput = document.getElementById('settingsApiKeyInput');
-  document.getElementById('saveSettingsKeyBtn').addEventListener('click', () => {
-    const key = settingsApiKeyInput.value.trim();
-    if (key && !key.startsWith('sk-')) { showToast('API Key 应以 sk- 开头'); return; }
-    localStorage.setItem(KEY_STORAGE, key);
-    currentApiKey = key;
-    settingsModal.classList.add('hidden');
-    showToast('Key 已保存');
-  });
-  document.getElementById('clearSettingsKeyBtn').addEventListener('click', () => {
-    localStorage.removeItem(KEY_STORAGE);
-    currentApiKey = '';
-    settingsApiKeyInput.value = '';
-    showToast('Key 已清除');
-  });
-  document.getElementById('closeSettingsModal').addEventListener('click', () => settingsModal.classList.add('hidden'));
-  settingsModal.addEventListener('click', e => { if(e.target === settingsModal) settingsModal.classList.add('hidden'); });
-  function openSettingsModal() {
-    settingsApiKeyInput.value = currentApiKey;
-    settingsModal.classList.remove('hidden');
-  }
-
-  // ==================== 模型选择 ====================
-  window.selectModel = function(model) {
-    MODEL_NAME = model;
-    localStorage.setItem('selectedModel', model);
-    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
-    document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
-    document.querySelector(`input[value="${model}"]`).checked = true;
-  };
-  selectModel(MODEL_NAME);
-
   // ==================== 人设编辑弹窗 ====================
   const personaEditModal = document.getElementById('personaEditModal');
   const personaEditTitle = document.getElementById('personaEditTitle');
@@ -581,12 +567,11 @@
     deletePersonaBtn.classList.remove('hidden');
     personaEditModal.classList.remove('hidden');
   }
-  cancelPersonaBtn.addEventListener('click', () => personaEditModal.classList.add('hidden'));
-  personaEditModal.addEventListener('click', e => { if(e.target === personaEditModal) personaEditModal.classList.add('hidden'); });
+  cancelPersonaBtn.addEventListener('click', () => closeModal(personaEditModal));
   savePersonaBtn.addEventListener('click', () => {
     const name = personaNameInput.value.trim();
     const prompt = personaPromptInput.value.trim();
-    if (!name) { alert('请输入人设名称'); return; }
+    if (!name) { showToast('请输入人设名称'); return; }
     if (isPersonaEditMode) {
       const p = personas.find(p => p.id === editingPersonaId);
       if (p) { p.name = name; p.prompt = prompt; }
@@ -597,16 +582,16 @@
     }
     savePersonas(personas);
     renderPersonaList();
-    personaEditModal.classList.add('hidden');
+    closeModal(personaEditModal);
   });
   deletePersonaBtn.addEventListener('click', () => {
-    if (editingPersonaId === 'default') { alert('不能删除默认人设'); return; }
+    if (editingPersonaId === 'default') { showToast('不能删除默认人设'); return; }
     if (confirm('确定删除此用户人设吗？')) {
       personas = personas.filter(p => p.id !== editingPersonaId);
       if (currentPersonaId === editingPersonaId) currentPersonaId = personas[0]?.id || 'default';
       savePersonas(personas);
       renderPersonaList();
-      personaEditModal.classList.add('hidden');
+      closeModal(personaEditModal);
     }
   });
 
@@ -634,11 +619,10 @@
     deleteCharBtn.classList.remove('hidden');
     charEditModal.classList.remove('hidden');
   }
-  cancelCharBtn.addEventListener('click', () => charEditModal.classList.add('hidden'));
-  charEditModal.addEventListener('click', e => { if(e.target === charEditModal) charEditModal.classList.add('hidden'); });
+  cancelCharBtn.addEventListener('click', () => closeModal(charEditModal));
   saveCharBtn.addEventListener('click', () => {
     const name = charNameInput.value.trim(), prompt = charPromptInput.value.trim();
-    if(!name||!prompt){ alert('请填写完整'); return; }
+    if(!name||!prompt){ showToast('请填写完整'); return; }
     if(isCharEditMode){
       const c = appData.characters.find(c => c.id === editingCharId);
       if(c){ c.name = name; c.systemPrompt = prompt; }
@@ -651,10 +635,10 @@
     saveData(appData);
     renderCharList();
     renderMessages();
-    charEditModal.classList.add('hidden');
+    closeModal(charEditModal);
   });
   deleteCharBtn.addEventListener('click', () => {
-    if (editingCharId === 'default') { alert('不能删除默认角色'); return; }
+    if (editingCharId === 'default') { showToast('不能删除默认角色'); return; }
     if (confirm('确定删除此AI角色及其聊天记录吗？')) {
       appData.characters = appData.characters.filter(c => c.id !== editingCharId);
       delete appData.messages[editingCharId];
@@ -662,17 +646,15 @@
       saveData(appData);
       renderCharList();
       renderMessages();
-      charEditModal.classList.add('hidden');
+      closeModal(charEditModal);
     }
   });
 
-  // ==================== 深度思考 ====================
+  // ==================== 深度思考与压缩 ====================
   thinkBtn.addEventListener('click', () => {
     deepThink = !deepThink;
     thinkBtn.classList.toggle('active', deepThink);
   });
-
-  // ==================== 压缩开关 ====================
   compressToggle.addEventListener('click', () => {
     compressEnabled = !compressEnabled;
     compressToggle.textContent = compressEnabled ? '🗜️ 开启' : '🗜️ 关闭';
@@ -793,7 +775,7 @@
   // ==================== 发送消息 ====================
   async function sendMessage() {
     if (!currentApiKey) {
-      showToast('请先设置 API Key！点击右上角齿轮⚙️');
+      showToast('请先在设置中输入 API Key');
       return;
     }
     const content = userInput.value.trim();
@@ -828,7 +810,10 @@
 
       const res = await fetch(API_URL, {
         method:'POST',
-        headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${currentApiKey}` },
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${currentApiKey}`
+        },
         body: JSON.stringify(body)
       });
 
@@ -867,7 +852,6 @@
     }
   }
 
-  // ==================== 事件绑定 ====================
   userInput.addEventListener('input', () => {
     userInput.style.height = 'auto';
     userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
@@ -877,7 +861,6 @@
   });
   sendBtn.addEventListener('click', sendMessage);
 
-  // ==================== 启动 ====================
   loadBackground();
   renderMessages();
   if(currentCharId) userInput.focus();

@@ -153,13 +153,15 @@
       background: #2a2a2a; padding: 8px 12px; border-radius: 10px;
       border: 1px solid #444; position: relative;
     }
-    .manage-item span {
-      flex: 1; font-size: 14px; color: white;
+    .manage-item .persona-name {
+      flex: 1; font-size: 14px; color: white; cursor: pointer;
     }
-    .manage-item .more-btn {
-      background: transparent; border: none; color: #aaa; font-size: 18px; padding: 4px;
-      cursor: pointer; letter-spacing: 2px;
+    .manage-item .persona-name:hover { text-decoration: underline; }
+    .manage-item button {
+      background: transparent; border: none; color: #aaa; font-size: 13px; padding: 4px 8px;
+      cursor: pointer; border-radius: 6px;
     }
+    .manage-item button:hover { background: #444; color: white; }
     .add-btn {
       background: #333; color: white; border: none; border-radius: 10px;
       padding: 8px; width: 100%; text-align: center; cursor: pointer; margin-top: 4px;
@@ -263,13 +265,13 @@
       <button class="btn-save" id="saveSettingsKeyBtn">保存 Key</button>
     </div>
     <h4>模型选择</h4>
-    <div class="model-card" id="modelCardFlash" onclick="selectModel('deepseek-v4-flash')">
-      <input type="radio" name="modelChoice" value="deepseek-v4-flash" checked>
-      <span class="model-name">V4-Flash (快速模式) <span class="model-badge">推荐</span></span>
+    <div class="model-card" id="modelCardChat" onclick="selectModel('deepseek-chat')">
+      <input type="radio" name="modelChoice" value="deepseek-chat" checked>
+      <span class="model-name">DeepSeek-Chat (通用对话) <span class="model-badge">推荐</span></span>
     </div>
-    <div class="model-card" id="modelCardPro" onclick="selectModel('deepseek-v4-pro')" style="margin-top:6px;">
-      <input type="radio" name="modelChoice" value="deepseek-v4-pro">
-      <span class="model-name">V4-Pro (专家模式)</span>
+    <div class="model-card" id="modelCardReasoner" onclick="selectModel('deepseek-reasoner')" style="margin-top:6px;">
+      <input type="radio" name="modelChoice" value="deepseek-reasoner">
+      <span class="model-name">DeepSeek-Reasoner (推理)</span>
     </div>
     <div class="modal-buttons" style="margin-top:12px;">
       <button class="btn-cancel" id="closeSettingsModal">关闭</button>
@@ -307,11 +309,11 @@
 
 <script>
   // ==================== 配置 ====================
-  const API_URL = 'https://api.deepseek.com/v1/chat/completions'; // 直连
-  let MODEL_NAME = localStorage.getItem('selectedModel') || 'deepseek-v4-flash';
-  const MAX_TOKENS = 30000;
+  const API_URL = 'https://api.deepseek.com/v1/chat/completions'; // 直连官方 API
   const KEY_STORAGE = 'user_api_key';
   let currentApiKey = localStorage.getItem(KEY_STORAGE) || '';
+  let MODEL_NAME = localStorage.getItem('selectedModel') || 'deepseek-chat'; // 默认通用模型
+  const MAX_TOKENS = 30000;
   let deepThink = false;
   let compressEnabled = true;
 
@@ -341,6 +343,7 @@
   let currentCharId = appData.characters[0]?.id || null;
   let currentPersonaId = personas[0]?.id || 'default';
 
+  // ==================== DOM 元素 ====================
   const chatList = document.getElementById('chatList');
   const userInput = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
@@ -352,7 +355,7 @@
   const totalTokensEl = document.getElementById('totalTokens');
   let currentAvatarTarget = null;
 
-  // ==================== 工具函数 ====================
+  // 工具函数
   function showToast(msg) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -369,14 +372,11 @@
     MODEL_NAME = model;
     localStorage.setItem('selectedModel', model);
     document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
-    document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
-    document.querySelector(`input[value="${model}"]`).checked = true;
+    document.getElementById(model === 'deepseek-chat' ? 'modelCardChat' : 'modelCardReasoner').classList.add('selected');
+    const radio = document.querySelector(`input[value="${model}"]`);
+    if (radio) radio.checked = true;
   };
   selectModel(MODEL_NAME);
-
-  // ==================== 弹窗通用事件 ====================
-  function closeModal(modal) { modal.classList.add('hidden'); }
-  document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if(e.target === m) m.classList.add('hidden'); }));
 
   // ==================== 设置弹窗 ====================
   const settingsModal = document.getElementById('settingsModal');
@@ -385,13 +385,13 @@
     settingsApiKeyInput.value = currentApiKey;
     settingsModal.classList.remove('hidden');
   });
-  document.getElementById('closeSettingsModal').addEventListener('click', () => closeModal(settingsModal));
+  document.getElementById('closeSettingsModal').addEventListener('click', () => settingsModal.classList.add('hidden'));
   document.getElementById('saveSettingsKeyBtn').addEventListener('click', () => {
     const key = settingsApiKeyInput.value.trim();
     if (key && !key.startsWith('sk-')) { showToast('Key 应以 sk- 开头'); return; }
     localStorage.setItem(KEY_STORAGE, key);
     currentApiKey = key;
-    closeModal(settingsModal);
+    settingsModal.classList.add('hidden');
     showToast('Key 已保存');
   });
   document.getElementById('clearSettingsKeyBtn').addEventListener('click', () => {
@@ -408,7 +408,7 @@
     renderPersonaList();
     personaModal.classList.remove('hidden');
   });
-  document.getElementById('closePersonaModal').addEventListener('click', () => closeModal(personaModal));
+  document.getElementById('closePersonaModal').addEventListener('click', () => personaModal.classList.add('hidden'));
   document.getElementById('addPersonaBtn').addEventListener('click', openNewPersona);
 
   function renderPersonaList() {
@@ -416,10 +416,17 @@
     personas.forEach(p => {
       const item = document.createElement('div');
       item.className = 'manage-item';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = p.name + (p.id === currentPersonaId ? ' (当前)' : '');
+      const nameSpan = document.createElement('div');
+      nameSpan.className = 'persona-name';
+      nameSpan.textContent = p.name;
+      if (p.id === currentPersonaId) nameSpan.style.color = '#12B7F5';
+      // 点击名称选用
+      nameSpan.addEventListener('click', () => {
+        currentPersonaId = p.id;
+        renderPersonaList();
+        showToast(`当前人设：${p.name}`);
+      });
       const moreBtn = document.createElement('button');
-      moreBtn.className = 'more-btn';
       moreBtn.textContent = '...';
       moreBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -478,7 +485,7 @@
     renderCharList();
     charModal.classList.remove('hidden');
   });
-  document.getElementById('closeCharModal').addEventListener('click', () => closeModal(charModal));
+  document.getElementById('closeCharModal').addEventListener('click', () => charModal.classList.add('hidden'));
   document.getElementById('addCharBtn').addEventListener('click', openNewCharacter);
 
   function renderCharList() {
@@ -486,10 +493,17 @@
     appData.characters.forEach(c => {
       const item = document.createElement('div');
       item.className = 'manage-item';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = c.name + (c.id === currentCharId ? ' (当前)' : '');
+      const nameSpan = document.createElement('div');
+      nameSpan.className = 'persona-name';
+      nameSpan.textContent = c.name;
+      if (c.id === currentCharId) nameSpan.style.color = '#12B7F5';
+      nameSpan.addEventListener('click', () => {
+        currentCharId = c.id;
+        renderCharList();
+        renderMessages();
+        showToast(`当前AI角色：${c.name}`);
+      });
       const moreBtn = document.createElement('button');
-      moreBtn.className = 'more-btn';
       moreBtn.textContent = '...';
       moreBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -567,7 +581,7 @@
     deletePersonaBtn.classList.remove('hidden');
     personaEditModal.classList.remove('hidden');
   }
-  cancelPersonaBtn.addEventListener('click', () => closeModal(personaEditModal));
+  cancelPersonaBtn.addEventListener('click', () => personaEditModal.classList.add('hidden'));
   savePersonaBtn.addEventListener('click', () => {
     const name = personaNameInput.value.trim();
     const prompt = personaPromptInput.value.trim();
@@ -582,7 +596,7 @@
     }
     savePersonas(personas);
     renderPersonaList();
-    closeModal(personaEditModal);
+    personaEditModal.classList.add('hidden');
   });
   deletePersonaBtn.addEventListener('click', () => {
     if (editingPersonaId === 'default') { showToast('不能删除默认人设'); return; }
@@ -591,7 +605,7 @@
       if (currentPersonaId === editingPersonaId) currentPersonaId = personas[0]?.id || 'default';
       savePersonas(personas);
       renderPersonaList();
-      closeModal(personaEditModal);
+      personaEditModal.classList.add('hidden');
     }
   });
 
@@ -619,7 +633,7 @@
     deleteCharBtn.classList.remove('hidden');
     charEditModal.classList.remove('hidden');
   }
-  cancelCharBtn.addEventListener('click', () => closeModal(charEditModal));
+  cancelCharBtn.addEventListener('click', () => charEditModal.classList.add('hidden'));
   saveCharBtn.addEventListener('click', () => {
     const name = charNameInput.value.trim(), prompt = charPromptInput.value.trim();
     if(!name||!prompt){ showToast('请填写完整'); return; }
@@ -635,7 +649,7 @@
     saveData(appData);
     renderCharList();
     renderMessages();
-    closeModal(charEditModal);
+    charEditModal.classList.add('hidden');
   });
   deleteCharBtn.addEventListener('click', () => {
     if (editingCharId === 'default') { showToast('不能删除默认角色'); return; }
@@ -646,11 +660,11 @@
       saveData(appData);
       renderCharList();
       renderMessages();
-      closeModal(charEditModal);
+      charEditModal.classList.add('hidden');
     }
   });
 
-  // ==================== 深度思考与压缩 ====================
+  // ==================== 深度思考、压缩 ====================
   thinkBtn.addEventListener('click', () => {
     deepThink = !deepThink;
     thinkBtn.classList.toggle('active', deepThink);
@@ -661,7 +675,7 @@
     compressToggle.classList.toggle('active', compressEnabled);
   });
 
-  // ==================== 背景与头像 ====================
+  // ==================== 背景、头像 ====================
   function loadBackground() {
     const savedBg = localStorage.getItem(BG_STORAGE_KEY);
     if (savedBg) chatList.style.backgroundImage = `url(${savedBg})`;
@@ -716,7 +730,7 @@
     avatarFileInput.value = '';
   });
 
-  // ==================== Token 统计与压缩 ====================
+  // ==================== Token 统计 ====================
   function estimateTokens(text) { return Math.ceil(text.length / 2); }
   function getMessageTokens(msg) {
     const chars = (msg.content||'').length + (msg.think||'').length;
@@ -772,7 +786,7 @@
     totalTokensEl.textContent = getTotalTokens(msgs);
   }
 
-  // ==================== 发送消息 ====================
+  // ==================== 发送消息（修正版） ====================
   async function sendMessage() {
     if (!currentApiKey) {
       showToast('请先在设置中输入 API Key');
@@ -806,6 +820,7 @@
         messages: messages.map(({ role, content }) => ({ role, content })),
         stream: true
       };
+      // 只在启用深度思考时添加 reasoning_effort（目前仅 deepseek-reasoner 支持）
       if (deepThink) body.reasoning_effort = 'high';
 
       const res = await fetch(API_URL, {
@@ -817,7 +832,10 @@
         body: JSON.stringify(body)
       });
 
-      if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+      if(!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();

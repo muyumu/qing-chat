@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="清">
+  <link rel="apple-touch-icon" href="icon.png">
+  <title>清</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh; height: 100dvh;
+    }
+    #app {
+      width: 100%; max-width: 450px;
+      height: 100vh; height: 100dvh;
+      background: #fff;
+      display: flex; flex-direction: column;
+      border: 3px solid #222;
+      border-radius: 12px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.6);
+      position: relative;
+      overflow: hidden;
+    }
+    .header {
+      background: #1a1a1a; color: white;
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0; z-index: 10; border-bottom: 1px solid #333;
+      flex-wrap: wrap;
+    }
+    .header select {
+      flex: 1; min-width: 80px;
+      padding: 8px 12px; border-radius: 20px;
+      border: 1px solid #444; font-size: 16px; background: #2a2a2a; color: white;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .header select option { color: #333; background: white; }
+    .header button {
+      background: #333; border: none; color: white; font-size: 18px;
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    .chat-list {
+      flex: 1; overflow-y: auto; padding: 15px;
+      display: flex; flex-direction: column; gap: 12px;
+      background-color: #f0f0f0; background-size: cover; background-position: center;
+      background-repeat: no-repeat; position: relative;
+      -webkit-overflow-scrolling: touch;
+    }
+    .chat-list::before {
+      content: ''; position: absolute; top:0; left:0; right:0; bottom:0;
+      background: rgba(255,255,255,0.6); z-index:0; pointer-events: none;
+    }
+    .chat-list > * { position: relative; z-index: 1; }
+    .message { display: flex; max-width: 85%; align-items: flex-end; gap: 8px; }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .message.assistant { align-self: flex-start; }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background-size: cover; background-position: center;
+      flex-shrink: 0; cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.8); box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .avatar-default {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; background: #444; color: white;
+    }
+    .bubble {
+      padding: 10px 14px; border-radius: 18px; font-size: 15px;
+      line-height: 1.5; word-break: break-word;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .message.user .bubble { background: rgba(0,0,0,0.7); color: white; border-bottom-right-radius: 4px; }
+    .message.assistant .bubble { background: rgba(255,255,255,0.75); color: #222; border-bottom-left-radius: 4px; }
+    .message.assistant .think-bubble {
+      background: rgba(200,200,200,0.5); color: #555; font-style: italic; margin-bottom: 6px;
+      border-radius: 12px; padding: 8px 12px; font-size: 13px;
+      border-bottom-left-radius: 4px;
+    }
+    .input-area {
+      display: flex; align-items: center; padding: 10px 12px;
+      background: #1a1a1a; border-top: 1px solid #333; gap: 8px; flex-shrink: 0;
+    }
+    .input-area textarea {
+      flex: 1; border: 1px solid #444; border-radius: 24px;
+      padding: 10px 14px; font-size: 15px; resize: none; outline: none;
+      background: #2a2a2a; color: white; max-height: 100px;
+    }
+    .input-area textarea::placeholder { color: #888; }
+    .input-area button {
+      border: none; border-radius: 50%; width: 40px; height: 40px;
+      font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    #bgBtn { background: #333; color: #ddd; font-size: 20px; }
+    #sendBtn { background: #000; color: white; font-size: 20px; border: 1px solid #444; }
+    #sendBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #thinkBtn { background: #333; color: #ddd; font-size: 18px; transition: all 0.2s; }
+    #thinkBtn.active { background: #ff9800; color: white; }
+    .token-bar {
+      background: #111; color: #aaa; font-size: 11px; padding: 6px 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-top: 1px solid #333; flex-shrink: 0;
+    }
+    .token-bar span { margin: 0 4px; }
+    #compressToggle {
+      background: #333; color: #ddd; border: none; border-radius: 12px;
+      padding: 3px 10px; font-size: 11px; cursor: pointer;
+    }
+    #compressToggle.active { background: #4caf50; color: white; }
+    .modal {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index:100;
+    }
+    .modal-content {
+      background: #1a1a1a; width: 90%; max-width: 400px; border-radius: 16px;
+      padding: 20px; display: flex; flex-direction: column; gap: 12px; color: white;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal-content h3 { text-align: center; }
+    .modal-content h4 { color: white; font-size: 14px; font-weight: 500; }
+    .modal-content input, .modal-content textarea {
+      padding: 10px; border: 1px solid #444; border-radius: 10px;
+      font-size: 14px; background: #2a2a2a; color: white;
+    }
+    .modal-content textarea { height: 100px; resize: vertical; }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-buttons button { padding: 8px 20px; border-radius: 20px; border: none; cursor: pointer; }
+    .btn-cancel { background: #444; color: #ccc; }
+    .btn-save { background: #fff; color: #000; font-weight: bold; }
+    .hidden { display: none !important; }
+    .empty-hint { text-align: center; color: #888; margin-top: 50%; }
+
+    /* 模型选择卡片样式 */
+    .model-card {
+      display: flex; align-items: center; gap: 12px;
+      background: #2a2a2a; padding: 12px; border-radius: 12px;
+      border: 1px solid #444; cursor: pointer; transition: all 0.2s;
+    }
+    .model-card.selected { border-color: #12B7F5; background: #1e2a3a; }
+    .model-card input[type="radio"] { accent-color: #12B7F5; width: 18px; height: 18px; }
+    .model-card .model-name { color: white; font-size: 14px; }
+    .model-card .model-badge { font-size: 11px; color: #12B7F5; margin-left: 6px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <select id="personaSelect" title="用户人设">
+      <option value="default">🙋 默认</option>
+    </select>
+    <select id="characterSelect" title="AI 角色"></select>
+    <button id="addPersonaBtn" title="新增用户人设">👤＋</button>
+    <button id="addCharacterBtn" title="新增AI角色">🤖＋</button>
+    <button id="settingsBtn" title="模型与设置">⚙️</button>
+  </div>
+  <div class="chat-list" id="chatList">
+    <div class="empty-hint">选择一个角色开始对话吧</div>
+  </div>
+  <div class="token-bar" id="tokenBar">
+    <span>📊 总 Tokens: <strong id="totalTokens">0</strong></span>
+    <button id="compressToggle" title="自动压缩开关">🗜️ 开启</button>
+  </div>
+  <div class="input-area">
+    <button id="bgBtn" title="更换聊天背景">🖼️</button>
+    <button id="thinkBtn" title="深度思考">🧠</button>
+    <textarea id="userInput" rows="1" placeholder="输入消息..."></textarea>
+    <button id="sendBtn" title="发送">➤</button>
+  </div>
+</div>
+<input type="file" id="bgFileInput" accept="image/*" style="display:none;">
+<input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+
+<!-- 设置弹窗（含模型选择） -->
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>设置</h3>
+    <h4>模型选择</h4>
+    <div class="model-card" id="modelCardFlash" onclick="selectModel('deepseek-v4-flash')">
+      <input type="radio" name="modelChoice" id="modelChoiceV4Flash" value="deepseek-v4-flash" checked>
+      <span class="model-name">V4-Flash (快速模式) <span class="model-badge">推荐</span></span>
+    </div>
+    <div class="model-card" id="modelCardPro" onclick="selectModel('deepseek-v4-pro')" style="margin-top:8px;">
+      <input type="radio" name="modelChoice" id="modelChoiceV4Pro" value="deepseek-v4-pro">
+      <span class="model-name">V4-Pro (专家模式)</span>
+    </div>
+    <div style="margin-top:12px;">
+      <h4>API Key</h4>
+      <input type="password" id="settingsApiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx">
+      <p style="font-size:11px;color:#aaa;margin-top:4px;">Key 仅保存在你的浏览器中。</p>
+    </div>
+    <div class="modal-buttons" style="margin-top:8px;">
+      <button class="btn-cancel" id="clearSettingsKeyBtn">清除 Key</button>
+      <button class="btn-save" id="saveSettingsBtn">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 人设编辑弹窗 -->
+<div id="personaModal" class="modal hidden">
+  <div class="modal-content">
+    <h3 id="personaModalTitle">新增用户人设</h3>
+    <input type="text" id="personaNameInput" placeholder="人设名称（如：小明）">
+    <textarea id="personaPromptInput" placeholder="人设描述（如：你是一个喜欢用文言文说话的文人）"></textarea>
+    <div class="modal-buttons">
+      <button class="btn-cancel" id="cancelPersonaBtn">取消</button>
+      <button class="btn-save" id="savePersonaBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 角色编辑弹窗 -->
+<div id="editModal" class="modal hidden">
+  <div class="modal-content">
+    <h3 id="modalTitle">编辑角色</h3>
+    <input type="text" id="charNameInput" placeholder="角色名称">
+    <textarea id="charPromptInput" placeholder="系统提示"></textarea>
+    <div class="modal-buttons">
+      <button class="btn-cancel" id="cancelEditBtn">取消</button>
+      <button class="btn-save" id="saveEditBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==================== 配置 ====================
+  const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+  let MODEL_NAME = localStorage.getItem('selectedModel') || 'deepseek-v4-flash';
+  const MAX_TOKENS = 30000;
+
+  // ==================== 全局状态 ====================
+  const KEY_STORAGE = 'user_api_key';
+  let currentApiKey = localStorage.getItem(KEY_STORAGE) || '';
+  let deepThink = false;
+  let compressEnabled = true;
+
+  // ==================== 数据管理 ====================
+  const STORAGE_KEY = 'deepseek_chat_data';
+  const PERSONA_STORAGE = 'user_personas';
+  const BG_STORAGE_KEY = 'deepseek_chat_bg';
+  const AVATAR_USER_KEY = 'avatar_user';
+  const AVATAR_AI_KEY = 'avatar_ai';
+
+  function loadData() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) try { return JSON.parse(raw); } catch(e) {}
+    const defaultChar = { id: 'default', name: '小深', systemPrompt: '你是一个热情、有用的AI助手，名字叫小深。' };
+    return { characters: [defaultChar], messages: { 'default': [] } };
+  }
+  function loadPersonas() {
+    const raw = localStorage.getItem(PERSONA_STORAGE);
+    if (raw) try { return JSON.parse(raw); } catch(e) {}
+    return [{ id: 'default', name: '默认', prompt: '' }];
+  }
+  function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+  function savePersonas(personas) { localStorage.setItem(PERSONA_STORAGE, JSON.stringify(personas)); }
+
+  let appData = loadData();
+  let personas = loadPersonas();
+  let currentCharId = appData.characters[0]?.id || null;
+  let currentPersonaId = personas[0]?.id || 'default';
+
+  // ==================== DOM 元素 ====================
+  const personaSelect = document.getElementById('personaSelect');
+  const characterSelect = document.getElementById('characterSelect');
+  const addPersonaBtn = document.getElementById('addPersonaBtn');
+  const addCharacterBtn = document.getElementById('addCharacterBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const chatList = document.getElementById('chatList');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const bgBtn = document.getElementById('bgBtn');
+  const thinkBtn = document.getElementById('thinkBtn');
+  const bgFileInput = document.getElementById('bgFileInput');
+  const avatarFileInput = document.getElementById('avatarFileInput');
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsApiKeyInput = document.getElementById('settingsApiKeyInput');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const clearSettingsKeyBtn = document.getElementById('clearSettingsKeyBtn');
+  const personaModal = document.getElementById('personaModal');
+  const personaModalTitle = document.getElementById('personaModalTitle');
+  const personaNameInput = document.getElementById('personaNameInput');
+  const personaPromptInput = document.getElementById('personaPromptInput');
+  const cancelPersonaBtn = document.getElementById('cancelPersonaBtn');
+  const savePersonaBtn = document.getElementById('savePersonaBtn');
+  const editModal = document.getElementById('editModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const charNameInput = document.getElementById('charNameInput');
+  const charPromptInput = document.getElementById('charPromptInput');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const saveEditBtn = document.getElementById('saveEditBtn');
+  const compressToggle = document.getElementById('compressToggle');
+  const totalTokensEl = document.getElementById('totalTokens');
+  let isEditMode = false, editingCharId = null;
+  let isPersonaEditMode = false, editingPersonaId = null;
+  let currentAvatarTarget = null;
+
+  // ==================== 模型选择 ====================
+  function selectModel(model) {
+    MODEL_NAME = model;
+    localStorage.setItem('selectedModel', model);
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
+    document.getElementById(model === 'deepseek-v4-flash' ? 'modelChoiceV4Flash' : 'modelChoiceV4Pro').checked = true;
+  }
+  // 初始化模型选中状态
+  selectModel(MODEL_NAME);
+
+  // ==================== 设置弹窗 ====================
+  settingsBtn.addEventListener('click', () => {
+    settingsApiKeyInput.value = currentApiKey;
+    settingsModal.classList.remove('hidden');
+  });
+  saveSettingsBtn.addEventListener('click', () => {
+    const key = settingsApiKeyInput.value.trim();
+    if (key && !key.startsWith('sk-')) { alert('API Key 应以 sk- 开头'); return; }
+    localStorage.setItem(KEY_STORAGE, key);
+    currentApiKey = key;
+    settingsModal.classList.add('hidden');
+  });
+  clearSettingsKeyBtn.addEventListener('click', () => {
+    localStorage.removeItem(KEY_STORAGE);
+    currentApiKey = '';
+    settingsApiKeyInput.value = '';
+  });
+  settingsModal.addEventListener('click', e => { if(e.target === settingsModal) settingsModal.classList.add('hidden'); });
+
+  // ==================== 深度思考 ====================
+  thinkBtn.addEventListener('click', () => {
+    deepThink = !deepThink;
+    thinkBtn.classList.toggle('active', deepThink);
+  });
+
+  // ==================== 压缩开关 ====================
+  compressToggle.addEventListener('click', () => {
+    compressEnabled = !compressEnabled;
+    compressToggle.textContent = compressEnabled ? '🗜️ 开启' : '🗜️ 关闭';
+    compressToggle.classList.toggle('active', compressEnabled);
+  });
+
+  // ==================== 背景与头像 ====================
+  function loadBackground() {
+    const savedBg = localStorage.getItem(BG_STORAGE_KEY);
+    if (savedBg) chatList.style.backgroundImage = `url(${savedBg})`;
+  }
+  function loadAvatar(role, element) {
+    const key = role === 'user' ? AVATAR_USER_KEY : AVATAR_AI_KEY;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      element.style.backgroundImage = `url(${saved})`;
+      element.classList.remove('avatar-default');
+      element.textContent = '';
+    } else {
+      element.classList.add('avatar-default');
+      element.style.backgroundImage = '';
+      element.textContent = role === 'user' ? '我' : '🤖';
+    }
+  }
+  function createAvatar(role) {
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar avatar-default';
+    avatar.textContent = role === 'user' ? '我' : '🤖';
+    loadAvatar(role, avatar);
+    avatar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentAvatarTarget = role;
+      avatarFileInput.click();
+    });
+    return avatar;
+  }
+  bgBtn.addEventListener('click', () => bgFileInput.click());
+  bgFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      localStorage.setItem(BG_STORAGE_KEY, ev.target.result);
+      chatList.style.backgroundImage = `url(${ev.target.result})`;
+    };
+    reader.readAsDataURL(file);
+    bgFileInput.value = '';
+  });
+  avatarFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const key = currentAvatarTarget === 'user' ? AVATAR_USER_KEY : AVATAR_AI_KEY;
+      localStorage.setItem(key, ev.target.result);
+      renderMessages();
+    };
+    reader.readAsDataURL(file);
+    avatarFileInput.value = '';
+  });
+
+  // ==================== 人设管理 ====================
+  function renderPersonaSelect() {
+    personaSelect.innerHTML = '';
+    personas.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id; opt.textContent = p.name;
+      personaSelect.appendChild(opt);
+    });
+    personaSelect.value = currentPersonaId;
+  }
+  function getCurrentPersonaPrompt() {
+    const p = personas.find(p => p.id === currentPersonaId);
+    return p ? p.prompt : '';
+  }
+  personaSelect.addEventListener('change', e => { currentPersonaId = e.target.value; });
+  addPersonaBtn.addEventListener('click', () => {
+    isPersonaEditMode = false; editingPersonaId = null;
+    personaModalTitle.textContent = '新增用户人设';
+    personaNameInput.value = ''; personaPromptInput.value = '';
+    personaModal.classList.remove('hidden');
+  });
+  personaSelect.addEventListener('dblclick', () => {
+    const p = personas.find(p => p.id === currentPersonaId);
+    if (!p || p.id === 'default') return;
+    isPersonaEditMode = true; editingPersonaId = p.id;
+    personaModalTitle.textContent = '编辑用户人设';
+    personaNameInput.value = p.name; personaPromptInput.value = p.prompt;
+    personaModal.classList.remove('hidden');
+  });
+  cancelPersonaBtn.addEventListener('click', () => personaModal.classList.add('hidden'));
+  savePersonaBtn.addEventListener('click', () => {
+    const name = personaNameInput.value.trim();
+    const prompt = personaPromptInput.value.trim();
+    if (!name) { alert('请输入人设名称'); return; }
+    if (isPersonaEditMode) {
+      const p = personas.find(p => p.id === editingPersonaId);
+      if (p) { p.name = name; p.prompt = prompt; }
+    } else {
+      const newId = 'p' + Date.now();
+      personas.push({ id: newId, name, prompt });
+      currentPersonaId = newId;
+    }
+    savePersonas(personas);
+    renderPersonaSelect();
+    personaModal.classList.add('hidden');
+  });
+  personaModal.addEventListener('click', e => { if(e.target === personaModal) personaModal.classList.add('hidden'); });
+
+  // ==================== AI 角色管理 ====================
+  function renderCharacterSelect() {
+    characterSelect.innerHTML = '';
+    appData.characters.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id; opt.textContent = c.name;
+      characterSelect.appendChild(opt);
+    });
+    characterSelect.value = currentCharId || '';
+  }
+  function getCurrentSystemPrompt() {
+    const c = appData.characters.find(c => c.id === currentCharId);
+    return c ? c.systemPrompt : '';
+  }
+  characterSelect.addEventListener('change', e => { currentCharId = e.target.value; updateUI(); });
+  addCharacterBtn.addEventListener('click', openAddModal);
+  function openAddModal() {
+    isEditMode = false; editingCharId = null; modalTitle.textContent = '新增AI角色';
+    charNameInput.value = ''; charPromptInput.value = ''; editModal.classList.remove('hidden'); charNameInput.focus();
+  }
+  function openEditModal() {
+    const c = appData.characters.find(c => c.id === currentCharId); if(!c) return;
+    isEditMode = true; editingCharId = c.id; modalTitle.textContent = '编辑AI角色';
+    charNameInput.value = c.name; charPromptInput.value = c.systemPrompt; editModal.classList.remove('hidden'); charNameInput.focus();
+  }
+  document.getElementById('editCharacterBtn').addEventListener('click', openEditModal);
+  cancelEditBtn.addEventListener('click', () => editModal.classList.add('hidden'));
+  saveEditBtn.addEventListener('click', () => {
+    const name = charNameInput.value.trim(), prompt = charPromptInput.value.trim();
+    if(!name||!prompt){ alert('请填写完整'); return; }
+    if(isEditMode){
+      const c = appData.characters.find(c => c.id === editingCharId);
+      if(c){ c.name = name; c.systemPrompt = prompt; }
+    } else {
+      const newId = 'c'+Date.now();
+      appData.characters.push({ id:newId, name, systemPrompt:prompt });
+      appData.messages[newId] = []; currentCharId = newId;
+    }
+    saveData(appData); updateUI(); editModal.classList.add('hidden');
+  });
+  editModal.addEventListener('click', e => { if(e.target === editModal) editModal.classList.add('hidden'); });
+
+  // ==================== Token 统计与压缩 ====================
+  function estimateTokens(text) { return Math.ceil(text.length / 2); }
+  function getMessageTokens(msg) {
+    const chars = (msg.content||'').length + (msg.think||'').length;
+    const tokens = estimateTokens(msg.content) + estimateTokens(msg.think);
+    return { chars, tokens };
+  }
+  function getTotalTokens(messages) {
+    let total = 0;
+    messages.forEach(m => { total += getMessageTokens(m).tokens; });
+    return total;
+  }
+  function compressHistory(msgs) {
+    const systemMsg = msgs.find(m => m.role === 'system');
+    const others = msgs.filter(m => m.role !== 'system');
+    if (others.length <= 20) return msgs;
+    const trimmed = others.slice(-20);
+    const notice = { role: 'assistant', content: '（之前的对话过长，已自动压缩）', think: '' };
+    return [systemMsg, notice, ...trimmed].filter(Boolean);
+  }
+
+  // ==================== 消息渲染 ====================
+  function renderMessages() {
+    chatList.innerHTML = '';
+    const msgs = appData.messages[currentCharId] || [];
+    if (!msgs.length) { chatList.innerHTML = '<div class="empty-hint">开始聊天吧</div>'; updateTokenBar(); return; }
+    msgs.forEach(m => {
+      const div = document.createElement('div'); div.className = `message ${m.role}`;
+      const av = createAvatar(m.role);
+      div.appendChild(av);
+      if (m.role === 'assistant' && m.think) {
+        const thinkBub = document.createElement('div');
+        thinkBub.className = 'think-bubble';
+        thinkBub.textContent = '💭 ' + m.think;
+        div.appendChild(thinkBub);
+      }
+      const bubWrap = document.createElement('div');
+      const bub = document.createElement('div');
+      bub.className = 'bubble';
+      bub.textContent = m.content || '';
+      bubWrap.appendChild(bub);
+      const stats = getMessageTokens(m);
+      const statSpan = document.createElement('div');
+      statSpan.style.cssText = 'font-size:10px; color:#888; margin-top:2px; text-align:right;';
+      statSpan.textContent = `📝 ${stats.chars} 字 | 🔤 ${stats.tokens} tokens`;
+      bubWrap.appendChild(statSpan);
+      div.appendChild(bubWrap);
+      chatList.appendChild(div);
+    });
+    chatList.scrollTop = chatList.scrollHeight;
+    updateTokenBar();
+  }
+  function updateTokenBar() {
+    const msgs = appData.messages[currentCharId] || [];
+    totalTokensEl.textContent = getTotalTokens(msgs);
+  }
+  function updateUI() { renderCharacterSelect(); renderMessages(); }
+
+  // ==================== 发送消息 ====================
+  async function sendMessage() {
+    if (!currentApiKey) {
+      alert('请先设置 API Key！点击右上角 ⚙️ 按钮。');
+      return;
+    }
+    const content = userInput.value.trim();
+    if(!content || !currentCharId) return;
+    if(!appData.messages[currentCharId]) appData.messages[currentCharId] = [];
+
+    // 构建含用户人设的消息
+    const personaPrompt = getCurrentPersonaPrompt();
+    let userMsgContent = content;
+    if (personaPrompt) {
+      userMsgContent = `[用户人设：${personaPrompt}]\n${content}`;
+    }
+    appData.messages[currentCharId].push({ role:'user', content: userMsgContent });
+    saveData(appData); renderMessages(); userInput.value = ''; userInput.style.height = 'auto';
+    sendBtn.disabled = true; userInput.disabled = true;
+
+    const assistantMsg = { role:'assistant', content: '', think: '' };
+    appData.messages[currentCharId].push(assistantMsg);
+    renderMessages();
+
+    try {
+      const system = getCurrentSystemPrompt();
+      let messages = [
+        { role:'system', content: system },
+        ...appData.messages[currentCharId].filter(m => m.role !== 'system' && m.content !== '')
+      ];
+      if (compressEnabled && getTotalTokens(messages) > MAX_TOKENS) {
+        messages = compressHistory(messages);
+      }
+      const body = {
+        model: MODEL_NAME,
+        messages: messages.map(({ role, content }) => ({ role, content })),
+        stream: true
+      };
+      if (deepThink) body.reasoning_effort = 'high';
+
+      const res = await fetch(API_URL, {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization': `Bearer ${currentApiKey}`
+        },
+        body: JSON.stringify(body)
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while(true) {
+        const {done, value} = await reader.read();
+        if(done) break;
+        buffer += decoder.decode(value, {stream:true});
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for(const line of lines) {
+          const trimmed = line.trim();
+          if(!trimmed || !trimmed.startsWith('data: ')) continue;
+          const dataStr = trimmed.slice(6);
+          if(dataStr === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(dataStr);
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta.reasoning_content) assistantMsg.think = (assistantMsg.think||'') + delta.reasoning_content;
+            if (delta.content) assistantMsg.content += delta.content;
+            renderMessages();
+          } catch(e) {}
+        }
+      }
+      if (!assistantMsg.content && !assistantMsg.think) appData.messages[currentCharId].pop();
+    } catch(e) {
+      alert('请求失败: ' + e.message);
+      appData.messages[currentCharId].pop();
+    } finally {
+      saveData(appData); renderMessages();
+      sendBtn.disabled = false; userInput.disabled = false; userInput.focus();
+    }
+  }
+
+  // ==================== 事件绑定 ====================
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = Math.min(userInput.scrollHeight, 100) + 'px';
+  });
+  userInput.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+
+  // ==================== 启动 ====================
+  loadBackground();
+  renderPersonaSelect();
+  renderCharacterSelect();
+  renderMessages();
+  if(currentCharId) userInput.focus();
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    });
+  }
+</script>
+</body>
+</html>

@@ -147,40 +147,51 @@
     .model-card .model-name { color: white; font-size: 14px; }
     .model-card .model-badge { font-size: 11px; color: #12B7F5; margin-left: 6px; }
 
-    .manage-list {
-      display: flex; flex-direction: column; gap: 8px;
-    }
+    .manage-list { display: flex; flex-direction: column; gap: 8px; }
     .manage-item {
       display: flex; align-items: center; gap: 8px;
       background: #2a2a2a; padding: 8px 12px; border-radius: 10px;
-      border: 1px solid #444;
+      border: 1px solid #444; position: relative;
     }
     .manage-item span {
       flex: 1; font-size: 14px; color: white;
     }
-    .manage-item button {
-      background: transparent; border: none; color: #aaa; font-size: 14px; padding: 4px;
-      cursor: pointer;
+    .manage-item .more-btn {
+      background: transparent; border: none; color: #aaa; font-size: 18px; padding: 4px;
+      cursor: pointer; letter-spacing: 2px;
     }
-    .manage-item button:hover { color: white; }
     .add-btn {
       background: #333; color: white; border: none; border-radius: 10px;
       padding: 8px; width: 100%; text-align: center; cursor: pointer; margin-top: 4px;
     }
+
+    /* 弹出菜单 */
+    .popup-menu {
+      position: absolute; right: 0; top: 100%; margin-top: 4px;
+      background: #2a2a2a; border: 1px solid #555; border-radius: 8px;
+      padding: 4px 0; z-index: 200; min-width: 120px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .popup-menu button {
+      display: block; width: 100%; background: transparent; border: none;
+      color: #ddd; padding: 8px 12px; text-align: left; font-size: 13px; cursor: pointer;
+    }
+    .popup-menu button:hover { background: #444; }
+    .popup-menu button.delete-btn { color: #e53935; }
   </style>
 </head>
 <body>
 <div id="app">
-  <!-- 顶部栏：用户图标、AI图标、标题、设置 -->
+  <!-- 顶部栏：用户三角、AI六角、标题、设置 -->
   <div class="header">
     <button class="icon-btn" id="personaBtn" title="用户人设">
       <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
-        <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/>
+        <path d="M12 2 L2 22 L22 22 Z"/>
       </svg>
     </button>
     <button class="icon-btn" id="charBtn" title="AI 角色">
       <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
-        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+        <polygon points="12,2 3,7 3,17 12,22 21,17 21,7"/>
       </svg>
     </button>
     <div class="title-area">清</div>
@@ -231,17 +242,17 @@
   </div>
 </div>
 
-<!-- 设置弹窗（模型、API Key） -->
+<!-- 设置弹窗 -->
 <div id="settingsModal" class="modal hidden">
   <div class="modal-content">
     <h3>设置</h3>
     <h4>模型选择</h4>
     <div class="model-card" id="modelCardFlash" onclick="selectModel('deepseek-v4-flash')">
-      <input type="radio" name="modelChoice" id="modelChoiceV4Flash" value="deepseek-v4-flash" checked>
+      <input type="radio" name="modelChoice" value="deepseek-v4-flash" checked>
       <span class="model-name">V4-Flash (快速模式) <span class="model-badge">推荐</span></span>
     </div>
     <div class="model-card" id="modelCardPro" onclick="selectModel('deepseek-v4-pro')" style="margin-top:6px;">
-      <input type="radio" name="modelChoice" id="modelChoiceV4Pro" value="deepseek-v4-pro">
+      <input type="radio" name="modelChoice" value="deepseek-v4-pro">
       <span class="model-name">V4-Pro (专家模式)</span>
     </div>
     <h4>API Key</h4>
@@ -256,7 +267,7 @@
   </div>
 </div>
 
-<!-- 人设编辑弹窗（新增/编辑用） -->
+<!-- 人设编辑弹窗 -->
 <div id="personaEditModal" class="modal hidden">
   <div class="modal-content">
     <h3 id="personaEditTitle">新增用户人设</h3>
@@ -270,7 +281,7 @@
   </div>
 </div>
 
-<!-- AI 角色编辑弹窗（新增/编辑用） -->
+<!-- AI 角色编辑弹窗 -->
 <div id="charEditModal" class="modal hidden">
   <div class="modal-content">
     <h3 id="charEditTitle">新增AI角色</h3>
@@ -330,7 +341,7 @@
   const avatarFileInput = document.getElementById('avatarFileInput');
   const compressToggle = document.getElementById('compressToggle');
   const totalTokensEl = document.getElementById('totalTokens');
-  let currentAvatarTarget = null;
+  let currentAvatarTarget = null; // 'user' or 'ai' for global avatar change
 
   // 顶部按钮
   document.getElementById('personaBtn').addEventListener('click', openPersonaModal);
@@ -351,34 +362,67 @@
       item.className = 'manage-item';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = p.name + (p.id === currentPersonaId ? ' (当前)' : '');
-      const setBtn = document.createElement('button');
-      setBtn.textContent = '选用';
-      setBtn.addEventListener('click', () => {
-        currentPersonaId = p.id;
-        renderPersonaList();
-      });
-      const editBtn = document.createElement('button');
-      editBtn.textContent = '✎';
-      editBtn.addEventListener('click', () => openEditPersona(p));
-      const delBtn = document.createElement('button');
-      delBtn.textContent = '✕';
-      delBtn.style.color = '#e53935';
-      delBtn.addEventListener('click', () => {
-        if (p.id === 'default') { alert('不能删除默认人设'); return; }
-        if (confirm('确定删除此用户人设吗？')) {
-          personas = personas.filter(x => x.id !== p.id);
-          if (currentPersonaId === p.id) currentPersonaId = personas[0]?.id || 'default';
-          savePersonas(personas);
-          renderPersonaList();
-        }
+      const moreBtn = document.createElement('button');
+      moreBtn.className = 'more-btn';
+      moreBtn.textContent = '...';
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showPersonaPopup(e, p, item);
       });
       item.appendChild(nameSpan);
-      item.appendChild(setBtn);
-      item.appendChild(editBtn);
-      item.appendChild(delBtn);
+      item.appendChild(moreBtn);
       personaList.appendChild(item);
     });
   }
+
+  function showPersonaPopup(e, persona, itemElement) {
+    // 移除旧菜单
+    document.querySelectorAll('.popup-menu').forEach(m => m.remove());
+    const menu = document.createElement('div');
+    menu.className = 'popup-menu';
+    menu.style.top = e.target.offsetTop + e.target.offsetHeight + 4 + 'px';
+    menu.style.right = '0px';
+    itemElement.appendChild(menu);
+    // 选项
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '编辑';
+    editBtn.addEventListener('click', () => {
+      menu.remove();
+      openEditPersona(persona);
+    });
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = '删除';
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.addEventListener('click', () => {
+      menu.remove();
+      if (persona.id === 'default') { alert('不能删除默认人设'); return; }
+      if (confirm('确定删除此用户人设吗？')) {
+        personas = personas.filter(x => x.id !== persona.id);
+        if (currentPersonaId === persona.id) currentPersonaId = personas[0]?.id || 'default';
+        savePersonas(personas);
+        renderPersonaList();
+      }
+    });
+    const avatarBtn = document.createElement('button');
+    avatarBtn.textContent = '更换头像';
+    avatarBtn.addEventListener('click', () => {
+      menu.remove();
+      currentAvatarTarget = 'user';
+      avatarFileInput.click();
+    });
+    menu.appendChild(editBtn);
+    menu.appendChild(avatarBtn);
+    menu.appendChild(deleteBtn);
+    // 点击其他地方关闭菜单
+    const closeMenu = (ev) => {
+      if (!menu.contains(ev.target) && ev.target !== moreBtn) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 10);
+  }
+
   function openPersonaModal() {
     renderPersonaList();
     personaModal.classList.remove('hidden');
@@ -398,37 +442,64 @@
       item.className = 'manage-item';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = c.name + (c.id === currentCharId ? ' (当前)' : '');
-      const setBtn = document.createElement('button');
-      setBtn.textContent = '选用';
-      setBtn.addEventListener('click', () => {
-        currentCharId = c.id;
-        renderCharList();
-        renderMessages();
-      });
-      const editBtn = document.createElement('button');
-      editBtn.textContent = '✎';
-      editBtn.addEventListener('click', () => openEditCharacter(c));
-      const delBtn = document.createElement('button');
-      delBtn.textContent = '✕';
-      delBtn.style.color = '#e53935';
-      delBtn.addEventListener('click', () => {
-        if (c.id === 'default') { alert('不能删除默认AI角色'); return; }
-        if (confirm('确定删除此AI角色及其聊天记录吗？')) {
-          appData.characters = appData.characters.filter(x => x.id !== c.id);
-          delete appData.messages[c.id];
-          if (currentCharId === c.id) currentCharId = appData.characters[0]?.id || null;
-          saveData(appData);
-          renderCharList();
-          renderMessages();
-        }
+      const moreBtn = document.createElement('button');
+      moreBtn.className = 'more-btn';
+      moreBtn.textContent = '...';
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showCharPopup(e, c, item);
       });
       item.appendChild(nameSpan);
-      item.appendChild(setBtn);
-      item.appendChild(editBtn);
-      item.appendChild(delBtn);
+      item.appendChild(moreBtn);
       charList.appendChild(item);
     });
   }
+
+  function showCharPopup(e, character, itemElement) {
+    document.querySelectorAll('.popup-menu').forEach(m => m.remove());
+    const menu = document.createElement('div');
+    menu.className = 'popup-menu';
+    itemElement.appendChild(menu);
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '编辑';
+    editBtn.addEventListener('click', () => {
+      menu.remove();
+      openEditCharacter(character);
+    });
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = '删除';
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.addEventListener('click', () => {
+      menu.remove();
+      if (character.id === 'default') { alert('不能删除默认AI角色'); return; }
+      if (confirm('确定删除此AI角色及其聊天记录吗？')) {
+        appData.characters = appData.characters.filter(x => x.id !== character.id);
+        delete appData.messages[character.id];
+        if (currentCharId === character.id) currentCharId = appData.characters[0]?.id || null;
+        saveData(appData);
+        renderCharList();
+        renderMessages();
+      }
+    });
+    const avatarBtn = document.createElement('button');
+    avatarBtn.textContent = '更换头像';
+    avatarBtn.addEventListener('click', () => {
+      menu.remove();
+      currentAvatarTarget = 'ai';
+      avatarFileInput.click();
+    });
+    menu.appendChild(editBtn);
+    menu.appendChild(avatarBtn);
+    menu.appendChild(deleteBtn);
+    const closeMenu = (ev) => {
+      if (!menu.contains(ev.target) && ev.target !== document.querySelector('.more-btn')) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 10);
+  }
+
   function openCharModal() {
     renderCharList();
     charModal.classList.remove('hidden');
@@ -463,6 +534,7 @@
     localStorage.setItem('selectedModel', model);
     document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
     document.getElementById(model === 'deepseek-v4-flash' ? 'modelCardFlash' : 'modelCardPro').classList.add('selected');
+    document.querySelector(`input[value="${model}"]`).checked = true;
   };
   selectModel(MODEL_NAME);
 
@@ -702,7 +774,7 @@
   // ==================== 发送消息 ====================
   async function sendMessage() {
     if (!currentApiKey) {
-      alert('请先设置 API Key！点击顶部 ⚙️ 按钮。');
+      alert('请先设置 API Key！点击右上角齿轮按钮。');
       return;
     }
     const content = userInput.value.trim();
